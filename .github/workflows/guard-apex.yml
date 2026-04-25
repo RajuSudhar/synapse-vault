@@ -1,0 +1,34 @@
+name: Guard apex branch
+
+on:
+  pull_request:
+    branches: [apex]
+
+jobs:
+  no-private-files:
+    name: Reject .private/ in apex
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for .private/ directory
+        run: |
+          if find .private -type f 2>/dev/null | head -1 | grep -q .; then
+            echo "::error::.private/ directory must not exist on apex branch"
+            echo "Strip private files before merging to apex."
+            echo ""
+            echo "Files found:"
+            find .private -type f
+            exit 1
+          fi
+          echo "Clean — no .private/ files found."
+
+      - name: Check for secrets patterns
+        run: |
+          PATTERNS="API_KEY|SECRET_KEY|PRIVATE_KEY|password\s*=|token\s*="
+          if grep -rIl -E "$PATTERNS" --include="*.toml" --include="*.env" --include="*.yml" --include="*.yaml" . 2>/dev/null | grep -v ".github/workflows" | head -1 | grep -q .; then
+            echo "::error::Potential secrets detected in committed files"
+            grep -rIl -E "$PATTERNS" --include="*.toml" --include="*.env" --include="*.yml" --include="*.yaml" . 2>/dev/null | grep -v ".github/workflows"
+            exit 1
+          fi
+          echo "Clean — no secret patterns detected."
